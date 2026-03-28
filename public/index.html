@@ -99,8 +99,12 @@ numbersDiv.appendChild(bull);
 
 function setMultiplier(m) {
   multiplier = m;
-  document.querySelectorAll("#m1,#m2,#m3").forEach(b => b.classList.remove("active"));
+
+  document.querySelectorAll("#m1,#m2,#m3")
+    .forEach(b => b.classList.remove("active"));
+
   document.getElementById("m" + m).classList.add("active");
+}
 }
 
 function addThrow(value) {
