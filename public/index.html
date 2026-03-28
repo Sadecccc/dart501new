@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dart 501</title>
+  <style>
+    button { margin: 4px; padding: 10px; }
+    .active { background: lightgreen; }
+  </style>
+</head>
+<body>
+
+<h1>Dart 501</h1>
+
+<input id="name" placeholder="Dein Name">
+
+<button onclick="createGame()">Spiel erstellen</button>
+
+<input id="gameIdInput" placeholder="Game ID">
+<button onclick="joinGame()">Beitreten</button>
+
+<h3 id="link"></h3>
+
+<div id="gameArea" style="display:none;">
+  <h2 id="turn"></h2>
+  <pre id="scores"></pre>
+
+  <h3>Multiplikator</h3>
+  <button onclick="setMultiplier(1)" id="m1">Single</button>
+  <button onclick="setMultiplier(2)" id="m2">Double</button>
+  <button onclick="setMultiplier(3)" id="m3">Triple</button>
+
+  <h3>Zahlen</h3>
+  <div id="numbers"></div>
+
+  <h3>Wurf</h3>
+  <p id="throws"></p>
+
+  <button onclick="undo()">Undo</button>
+  <button onclick="submitTurn()">Zug beenden</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+
+let gameId = null;
+let multiplier = 1;
+let currentThrows = [];
+
+const numbersDiv = document.getElementById("numbers");
+
+for (let i = 1; i <= 20; i++) {
+  const btn = document.createElement("button");
+  btn.innerText = i;
+  btn.onclick = () => addThrow(i);
+  numbersDiv.appendChild(btn);
+}
+
+const bull = document.createElement("button");
+bull.innerText = "Bull";
+bull.onclick = () => addThrow(25);
+numbersDiv.appendChild(bull);
+
+function setMultiplier(m) {
+  multiplier = m;
+  document.querySelectorAll("#m1,#m2,#m3").forEach(b => b.classList.remove("active"));
+  document.getElementById("m" + m).classList.add("active");
+}
+
+function addThrow(value) {
+  if (currentThrows.length >= 3) return;
+  let points = value * multiplier;
+  if (value === 25 && multiplier === 2) points = 50;
+  currentThrows.push({ value, multiplier, points });
+  updateThrows();
+}
+
+function updateThrows() {
+  document.getElementById("throws").innerText =
+    currentThrows.map(t => `${t.multiplier}x${t.value} (${t.points})`).join(" | ");
+}
+
+function undo() {
+  currentThrows.pop();
+  updateThrows();
+}
+
+function submitTurn() {
+  const total = currentThrows.reduce((s, t) => s + t.points, 0);
+  const last = currentThrows[currentThrows.length - 1];
+
+  socket.emit("throw", {
+    gameId,
+    points: total,
+    isDouble: last && last.multiplier === 2
+  });
+
+  currentThrows = [];
+  updateThrows();
+}
+
+function createGame() {
+  const name = document.getElementById("name").value;
+  socket.emit("createGame", { name });
+}
+
+function joinGame() {
+  const name = document.getElementById("name").value;
+  gameId = document.getElementById("gameIdInput").value;
+
+  socket.emit("joinGame", { gameId, name });
+  document.getElementById("gameArea").style.display = "block";
+}
+
+socket.on("gameCreated", (id) => {
+  gameId = id;
+  const link = window.location.origin + "?game=" + id;
+  document.getElementById("link").innerText = "Link: " + link;
+  document.getElementById("gameArea").style.display = "block";
+});
+
+socket.on("gameUpdate", (game) => {
+  let text = "";
+  game.players.forEach(p => {
+    text += `${p.name}: ${game.scores[p.id]}\n`;
+  });
+  document.getElementById("scores").innerText = text;
+
+  const current = game.players.find(p => p.id === game.turn);
+  document.getElementById("turn").innerText = "Am Zug: " + current.name;
+});
+
+socket.on("gameOver", () => {
+  alert("Spiel beendet!");
+});
+</script>
+
+</body>
+</html>
