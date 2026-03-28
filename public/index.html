@@ -1,27 +1,6 @@
 <!DOCTYPE html>
 <html>
-<input id="name" placeholder="Dein Name">
-<button onclick="createGame()">Spiel erstellen</button>
 
-<input id="gameIdInput" placeholder="Game ID">
-<button onclick="joinGame()">Beitreten</button>
-
-<h3 id="link"></h3>
-
-<div id="gameArea" style="display:none;">
-  <h2 id="turn"></h2>
-  <pre id="scores"></pre>
-  <h3>Average: <span id="avg">0.00</span></h3>
-  ...
-</div>
-
-<div id="overlay" class="overlay">
-  <div class="overlay-content">
-    <h2>Spiel beendet</h2>
-    <p id="winnerText"></p>
-    <button onclick="closeOverlay()">Schließen</button>
-  </div>
-</div>
 <style>
 body {
   font-family: Arial;
