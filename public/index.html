@@ -28,6 +28,7 @@ button:active { background: #334155; }
 .last-throws p { margin:2px 0; }
 .last-throws .last { font-weight:bold; }
 .checkout { margin-top:10px; font-size:14px; color:#22c55e; }
+.set-leg-display { margin-top:5px; font-size:14px; color:#a5b4fc; }
 </style>
 </head>
 <body>
@@ -36,8 +37,14 @@ button:active { background: #334155; }
 
 <div class="card" id="setup">
   <input id="name" placeholder="Dein Name">
-  <input type="number" id="setsToWin" placeholder="Sets zum Sieg" value="3">
-  <input type="number" id="legsToWin" placeholder="Legs zum Sieg" value="5">
+  <div>
+    <label for="setsToWin">Sets zum Sieg:</label>
+    <input type="number" id="setsToWin" value="3" min="1">
+  </div>
+  <div>
+    <label for="legsToWin">Legs zum Sieg:</label>
+    <input type="number" id="legsToWin" value="5" min="1">
+  </div>
   <button onclick="createGame()">Spiel erstellen</button>
   <input id="gameIdInput" placeholder="Game ID">
   <button onclick="joinGame()">Beitreten</button>
@@ -84,11 +91,11 @@ let players = [];
 let playerScores = {};
 let totalPoints = {};
 let totalDarts = {};
-let lastThrows = {};
+let lastThrows = {}; // jetzt Summe der Aufnahmen (3 Darts)
+let playerSets = {}; // gewonnene Sets
+let playerLegs = {}; // gewonnene Legs
 let setsToWin = 3;
 let legsToWin = 5;
-
-const socket = io();
 
 // -------------------
 // Zahlen Buttons
@@ -105,20 +112,23 @@ bull.onclick=()=>addThrow(25);
 numbersDiv.appendChild(bull);
 
 // -------------------
-// Spielerstatistiken anzeigen
+// Spielerstatistiken
 function updatePlayerStats(){
   const container=document.getElementById("playerStats");
   container.innerHTML="";
-  players.forEach((p,i)=>{
+  players.forEach(p=>{
     const div=document.createElement("div");
     div.className="stats";
     const avg=(totalDarts[p.id]? (totalPoints[p.id]/totalDarts[p.id]*3).toFixed(2) : "0.00");
     const last=lastThrows[p.id]||[];
     const lastHTML=last.map((v,idx)=>idx===last.length-1? `<p class="last">${v}</p>`:`<p>${v}</p>`).join("");
+    const sets=playerSets[p.id]||0;
+    const legs=playerLegs[p.id]||0;
     div.innerHTML=`<h3>${p.name}</h3>
       <p>Score: ${playerScores[p.id]||501}</p>
       <p>Average: ${avg}</p>
-      <div class="last-throws">${lastHTML}</div>`;
+      <div class="set-leg-display">Sets: ${sets} | Legs: ${legs}</div>
+      <div class="last-throws">Letzte 5 Aufnahmen:<br>${lastHTML}</div>`;
     container.appendChild(div);
   });
 }
@@ -127,15 +137,15 @@ function updatePlayerStats(){
 // Darts hinzufügen
 function addThrow(value){
   if(currentThrows.length>=3) return;
-  const currentPlayerId = players[0]?.id; // für Test: aktueller Spieler
+  const currentPlayerId = players[0]?.id;
   if(!currentPlayerId) return;
 
-  let points = value*multiplier;
+  let points=value*multiplier;
   if(value===25 && multiplier===2) points=50;
 
   const remaining = playerScores[currentPlayerId]||501;
 
-  // Überwurf: Punkte > Rest oder Rest == 1 → Zug beenden
+  // Überwurf oder Rest==1 → Zug beenden
   if(points>remaining || remaining-points===1){
     currentThrows.push({value,multiplier,points:"Bust"});
     endTurn(currentPlayerId);
@@ -145,10 +155,10 @@ function addThrow(value){
   currentThrows.push({value,multiplier,points});
   updateThrows();
 
-  // Checkout anzeigen
+  // Checkout
   updateCheckout(remaining - points);
 
-  // Auto Single zurücksetzen
+  // Auto Single
   setMultiplier(1);
 
   if(currentThrows.length===3) setTimeout(()=>submitTurn(),500);
@@ -158,28 +168,29 @@ function addThrow(value){
 function submitTurn(){
   const currentPlayerId = players[0]?.id;
   if(!currentPlayerId) return;
-  const total=currentThrows.reduce((s,t)=>typeof t.points==="number"? s+t.points:s,0);
 
+  const total=currentThrows.reduce((s,t)=>typeof t.points==="number"? s+t.points:s,0);
   playerScores[currentPlayerId]-=total;
   totalPoints[currentPlayerId]=(totalPoints[currentPlayerId]||0)+total;
   totalDarts[currentPlayerId]=(totalDarts[currentPlayerId]||0)+currentThrows.filter(t=>typeof t.points==="number").length;
 
+  // Letzte 5 Aufnahmen summieren
   if(!lastThrows[currentPlayerId]) lastThrows[currentPlayerId]=[];
-  lastThrows[currentPlayerId].push(...currentThrows.map(t=>typeof t.points==="number"?t.points:"Bust"));
+  const sum = currentThrows.filter(t=>typeof t.points==="number").reduce((a,b)=>a+b,0);
+  lastThrows[currentPlayerId].push(sum);
   if(lastThrows[currentPlayerId].length>5) lastThrows[currentPlayerId]=lastThrows[currentPlayerId].slice(-5);
 
   currentThrows=[];
   updateThrows();
   updatePlayerStats();
   document.getElementById("checkout").innerText="";
-
   socket.emit("throw",{gameId,points:total});
 }
 
 // -------------------
 function endTurn(playerId){
   submitTurn();
-  // TODO: Socket Event für nächsten Spieler senden
+  // TODO: Socket Event für nächsten Spieler
 }
 
 // -------------------
@@ -199,7 +210,6 @@ function setMultiplier(m){
 
 // -------------------
 function updateCheckout(remaining){
-  // einfache Checkout-Beispiele
   const checkouts = {
     170:"T20 T20 Bull",
     167:"T20 T19 Bull",
@@ -245,6 +255,11 @@ socket.on("gameUpdate",game=>{
   players=game.players;
   playerScores={};
   players.forEach(p=>playerScores[p.id]=game.scores[p.id]);
+  // Sets & Legs simuliert
+  players.forEach(p=>{
+    playerSets[p.id]=game.sets?.[p.id]||0;
+    playerLegs[p.id]=game.legs?.[p.id]||0;
+  });
   updatePlayerStats();
 });
 
