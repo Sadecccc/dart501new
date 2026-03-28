@@ -46,8 +46,12 @@ button:active { background: #334155; }
     <label for="legsToWin">Legs zum Sieg:</label>
     <input type="number" id="legsToWin" value="5" min="1">
   </div>
+  <div>
+    <label for="gameCode">Lobby-Code (frei wählbar):</label>
+    <input id="gameCode" placeholder="z.B. MEINCODE123">
+  </div>
   <button onclick="createGame()">Spiel erstellen</button>
-  <input id="gameIdInput" placeholder="Game ID">
+  <input id="gameIdInput" placeholder="Lobby-Code eingeben">
   <button onclick="joinGame()">Beitreten</button>
   <h3 id="link"></h3>
 </div>
@@ -228,22 +232,31 @@ function updateCheckout(remaining){
   document.getElementById("checkout").innerText=table[remaining]||"";
 }
 
+// === Anpassungen für Lobby-Codes ===
 function createGame(){
-  const name=document.getElementById("name").value;
-  setsToWin=parseInt(document.getElementById("setsToWin").value)||3;
-  legsToWin=parseInt(document.getElementById("legsToWin").value)||5;
-  if(!name){alert("Bitte Namen eingeben!"); return;}
-  socket.emit("createGame",{name,setsToWin,legsToWin});
-  document.getElementById("setup").style.display="none";
-  document.getElementById("gameArea").style.display="block";
+  const name = document.getElementById("name").value;
+  const code = document.getElementById("gameCode").value.trim();
+  setsToWin = parseInt(document.getElementById("setsToWin").value) || 3;
+  legsToWin = parseInt(document.getElementById("legsToWin").value) || 5;
+
+  if(!name){ alert("Bitte Namen eingeben!"); return; }
+  if(!code){ alert("Bitte einen Lobby-Code eingeben!"); return; }
+
+  socket.emit("createGame",{name,setsToWin,legsToWin,code});
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("gameArea").style.display = "block";
 }
 
 function joinGame(){
-  const name=document.getElementById("name").value;
-  gameId=document.getElementById("gameIdInput").value;
-  socket.emit("joinGame",{gameId,name});
-  document.getElementById("setup").style.display="none";
-  document.getElementById("gameArea").style.display="block";
+  const name = document.getElementById("name").value;
+  const code = document.getElementById("gameIdInput").value.trim();
+
+  if(!name){ alert("Bitte Namen eingeben!"); return; }
+  if(!code){ alert("Bitte Lobby-Code eingeben!"); return; }
+
+  socket.emit("joinGame",{code,name});
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("gameArea").style.display = "block";
 }
 
 socket.on("gameCreated", id => {
