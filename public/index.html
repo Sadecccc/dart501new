@@ -85,12 +85,13 @@ button:active { background: #334155; }
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+const socket = io();
+
 let gameId;
-let currentThrows = [];
-let multiplier = 1;
 let players = [];
 let currentPlayerIndex = 0;
-
+let currentThrows = [];
+let multiplier = 1;
 let playerScores = {};
 let totalPoints = {};
 let totalDarts = {};
@@ -100,8 +101,7 @@ let playerLegs = {};
 let setsToWin = 3;
 let legsToWin = 5;
 
-// -------------------
-// Zahlen Buttons
+// Zahlen Buttons erstellen
 const numbersDiv = document.getElementById("numbers");
 for(let i=1;i<=20;i++){
   const btn=document.createElement("button");
@@ -114,8 +114,6 @@ bull.innerText="25";
 bull.onclick=()=>addThrow(25);
 numbersDiv.appendChild(bull);
 
-// -------------------
-// Spielerstatistiken
 function updatePlayerStats(){
   const container=document.getElementById("playerStats");
   container.innerHTML="";
@@ -124,34 +122,29 @@ function updatePlayerStats(){
     div.className="stats";
     const avg=(totalDarts[p.id]? (totalPoints[p.id]/totalDarts[p.id]*3).toFixed(2) : "0.00");
     const last=lastThrows[p.id]||[];
-    const lastHTML=last.map((v,idx)=>idx===last.length-1? `<p class="last">${v}</p>`:`<p>${v}</p>`).join("");
+    const lastHTML=last.map(v=>`<p>${v}</p>`).join("");
     const sets=playerSets[p.id]||0;
     const legs=playerLegs[p.id]||0;
     const currentScore = playerScores[p.id]!==undefined? playerScores[p.id]:501;
     div.innerHTML=`<h3>${p.name}${i===currentPlayerIndex?' 🔹':''}</h3>
-      <p class="score">Score: ${currentScore}</p>
-      <p>Average: ${avg}</p>
-      <div class="set-leg-display">Sets: ${sets} | Legs: ${legs}</div>
-      <div class="last-throws">Letzte 5 Aufnahmen:<br>${lastHTML}</div>`;
+        <p class="score">Score: ${currentScore}</p>
+        <p>Average: ${avg}</p>
+        <div class="set-leg-display">Sets: ${sets} | Legs: ${legs}</div>
+        <div class="last-throws">Letzte 5 Aufnahmen:<br>${lastHTML}</div>`;
     container.appendChild(div);
   });
 }
 
-// -------------------
-// Darts hinzufügen
 function addThrow(value){
   if(currentThrows.length>=3) return;
   const player = players[currentPlayerIndex];
   if(!player) return;
 
-  let points=value*multiplier;
+  let points = value*multiplier;
   if(value===25 && multiplier===2) points=50;
+  const remaining = playerScores[player.id];
 
-  const remaining = playerScores[player.id] || 501;
-
-  // Bust oder Rest == 1 → sofort Zug beenden
-  if(points>remaining || (remaining-points===1) || (remaining-points===0 && multiplier!==2)){
-    // nur bei korrektes Doppel ausmachen erlaubt
+  if(points>remaining || remaining-points===1 || (remaining-points===0 && multiplier!==2)){
     currentThrows.push({value,multiplier,points:"Bust"});
     endTurn();
     return;
@@ -165,18 +158,13 @@ function addThrow(value){
   if(currentThrows.length===3) setTimeout(()=>submitTurn(),100);
 }
 
-// -------------------
 function submitTurn(){
   const player = players[currentPlayerIndex];
   if(!player) return;
+  const total = currentThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
+  const remainingBefore = playerScores[player.id];
 
-  const total=currentThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
-
-  const remainingBefore=playerScores[player.id];
-
-  // Bust Regel
   if(total>remainingBefore || remainingBefore-total===1 || (remainingBefore-total===0 && currentThrows.slice(-1)[0].multiplier!==2)){
-    // Score zurücksetzen
     currentThrows=[];
     updateThrows();
     endTurn();
@@ -187,13 +175,11 @@ function submitTurn(){
   totalPoints[player.id]=(totalPoints[player.id]||0)+total;
   totalDarts[player.id]=(totalDarts[player.id]||0)+currentThrows.filter(t=>typeof t.points==="number").length;
 
-  // Letzte 5 Aufnahmen Summe
   if(!lastThrows[player.id]) lastThrows[player.id]=[];
   const sum=currentThrows.filter(t=>typeof t.points==="number").reduce((a,b)=>a+b,0);
   lastThrows[player.id].push(sum);
   if(lastThrows[player.id].length>5) lastThrows[player.id]=lastThrows[player.id].slice(-5);
 
-  // Leg Ende prüfen
   if(playerScores[player.id]===0){
     playerLegs[player.id]=(playerLegs[player.id]||0)+1;
     players.forEach(p=>playerScores[p.id]=501);
@@ -212,12 +198,10 @@ function submitTurn(){
 
   currentThrows=[];
   updateThrows();
-  document.getElementById("checkout").innerText="";
   updatePlayerStats();
   endTurn();
 }
 
-// -------------------
 function endTurn(){
   currentThrows=[];
   currentPlayerIndex=(currentPlayerIndex+1)%players.length;
@@ -226,29 +210,24 @@ function endTurn(){
   document.getElementById("checkout").innerText="";
 }
 
-// -------------------
 function updateThrows(){
   document.getElementById("throws").innerText=currentThrows.map(t=>typeof t.points==="number"? t.points: t.points).join(", ");
 }
 
-// -------------------
 function undo(){ currentThrows.pop(); updateThrows(); }
 
-// -------------------
 function setMultiplier(m){
   multiplier=m;
   document.querySelectorAll("#m1,#m2,#m3").forEach(b=>b.classList.remove("active"));
   document.getElementById("m"+m).classList.add("active");
 }
 
-// -------------------
 function updateCheckout(remaining){
   const table = {170:"T20 T20 Bull",167:"T20 T19 Bull",164:"T20 T18 Bull",161:"T20 T17 Bull",
-    160:"T20 T20 D20",158:"T20 T20 D19",157:"T20 T19 D20",156:"T20 T20 D18",155:"T20 T19 D19"};
+                 160:"T20 T20 D20",158:"T20 T20 D19",157:"T20 T19 D20",156:"T20 T20 D18",155:"T20 T19 D19"};
   document.getElementById("checkout").innerText=table[remaining]||"";
 }
 
-// -------------------
 function createGame(){
   const name=document.getElementById("name").value;
   setsToWin=parseInt(document.getElementById("setsToWin").value)||3;
@@ -259,7 +238,6 @@ function createGame(){
   document.getElementById("gameArea").style.display="block";
 }
 
-// -------------------
 function joinGame(){
   const name=document.getElementById("name").value;
   gameId=document.getElementById("gameIdInput").value;
@@ -268,7 +246,6 @@ function joinGame(){
   document.getElementById("gameArea").style.display="block";
 }
 
-// -------------------
 socket.on("gameCreated",id=>{
   gameId=id;
   document.getElementById("link").innerText=window.location.origin+"?game="+id;
@@ -291,6 +268,5 @@ socket.on("gameOver",({winner})=>{
 
 function closeOverlay(){document.getElementById("overlay").style.display="none";}
 </script>
-
 </body>
 </html>
