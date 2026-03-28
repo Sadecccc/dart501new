@@ -64,6 +64,8 @@ button:active { background: #334155; }
   <div class="card">
     <h3>Zahlen</h3>
     <div id="numbers"></div>
+    <input id="customThrow" placeholder="Punkte eingeben" style="width:50%;margin-top:5px;">
+    <button onclick="submitCustomThrow()">Wurf hinzufügen</button>
   </div>
 
   <div class="card">
@@ -114,6 +116,7 @@ bull.innerText="25";
 bull.onclick=()=>addThrow(25);
 numbersDiv.appendChild(bull);
 
+// --- Spielerstatistiken aktualisieren ---
 function updatePlayerStats(){
   const container=document.getElementById("playerStats");
   container.innerHTML="";
@@ -135,7 +138,7 @@ function updatePlayerStats(){
   });
 }
 
-// --- Check ob die Punkte ausmachbar sind ---
+// --- Checkout-Prüfung: letzte Darts müssen Double/Bull sein ---
 function isCheckoutPossible(throws, remaining){
   let total = 0;
   for(let t of throws){
@@ -144,13 +147,13 @@ function isCheckoutPossible(throws, remaining){
     total += pts;
   }
   let lastThrow = throws[throws.length-1];
-  // Prüfe ob letzter Dart Double oder Bull ist
   if(remaining - total === 0){
     return (lastThrow.multiplier === 2 || (lastThrow.value===25 && lastThrow.multiplier>=1));
   }
-  return false;
+  return total <= remaining;
 }
 
+// --- Dart hinzufügen ---
 function addThrow(value){
   if(currentThrows.length>=3) return;
   const player = players[currentPlayerIndex];
@@ -160,10 +163,8 @@ function addThrow(value){
   if(value===25 && multiplier===2) points=50;
   const remaining = playerScores[player.id];
 
-  // Prüfe auf Bust
   let tempThrows = [...currentThrows,{value,multiplier,points}];
-  let tempTotal = tempThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
-  if(tempTotal>remaining || remaining-tempTotal===1 || !isCheckoutPossible(tempThrows, remaining)){
+  if(!isCheckoutPossible(tempThrows, remaining)){
     currentThrows.push({value,multiplier,points:"Bust"});
     endTurn();
     return;
@@ -177,14 +178,21 @@ function addThrow(value){
   if(currentThrows.length===3) setTimeout(()=>submitTurn(),100);
 }
 
+// --- Custom Input Dart ---
+function submitCustomThrow(){
+  const val = parseInt(document.getElementById("customThrow").value);
+  if(!isNaN(val) && val >=0 && val <= 25) addThrow(val);
+  document.getElementById("customThrow").value = "";
+}
+
+// --- Turn abschließen ---
 function submitTurn(){
   const player = players[currentPlayerIndex];
   if(!player) return;
   const total = currentThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
   const remainingBefore = playerScores[player.id];
 
-  let tempTotalThrows = currentThrows;
-  if(total>remainingBefore || remainingBefore-total===1 || !isCheckoutPossible(tempTotalThrows, remainingBefore)){
+  if(!isCheckoutPossible(currentThrows, remainingBefore)){
     currentThrows=[];
     updateThrows();
     endTurn();
@@ -248,7 +256,6 @@ function updateCheckout(remaining){
   document.getElementById("checkout").innerText=table[remaining]||"";
 }
 
-// --- Neue Funktion: Game-ID generieren ---
 function generateGameId() {
   return Math.floor(100000 + Math.random()*900000).toString(); // 6-stelliger Code
 }
@@ -258,7 +265,7 @@ function createGame(){
   setsToWin=parseInt(document.getElementById("setsToWin").value)||3;
   legsToWin=parseInt(document.getElementById("legsToWin").value)||5;
   if(!name){alert("Bitte Namen eingeben!"); return;}
-  gameId = generateGameId(); // automatisch Game-ID erstellen
+  gameId = generateGameId();
   socket.emit("createGame",{name,setsToWin,legsToWin, gameId});
   document.getElementById("link").innerText=`Game-ID: ${gameId} | Link: ${window.location.origin}?game=${gameId}`;
   document.getElementById("setup").style.display="none";
