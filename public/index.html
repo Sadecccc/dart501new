@@ -101,9 +101,9 @@ let playerLegs = {};
 let setsToWin = 3;
 let legsToWin = 5;
 
-// --- Zahlen Buttons erstellen ---
+// --- Zahlen Buttons erstellen inkl. 0 ---
 const numbersDiv = document.getElementById("numbers");
-for(let i=1;i<=20;i++){
+for(let i=0;i<=20;i++){
   const btn=document.createElement("button");
   btn.innerText=i;
   btn.onclick=()=>addThrow(i);
@@ -135,6 +135,22 @@ function updatePlayerStats(){
   });
 }
 
+// --- Check ob die Punkte ausmachbar sind ---
+function isCheckoutPossible(throws, remaining){
+  let total = 0;
+  for(let t of throws){
+    let pts = t.value * t.multiplier;
+    if(t.value===25 && t.multiplier===2) pts = 50;
+    total += pts;
+  }
+  let lastThrow = throws[throws.length-1];
+  // Prüfe ob letzter Dart Double oder Bull ist
+  if(remaining - total === 0){
+    return (lastThrow.multiplier === 2 || (lastThrow.value===25 && lastThrow.multiplier>=1));
+  }
+  return false;
+}
+
 function addThrow(value){
   if(currentThrows.length>=3) return;
   const player = players[currentPlayerIndex];
@@ -144,7 +160,10 @@ function addThrow(value){
   if(value===25 && multiplier===2) points=50;
   const remaining = playerScores[player.id];
 
-  if(points>remaining || remaining-points===1 || (remaining-points===0 && multiplier!==2)){
+  // Prüfe auf Bust
+  let tempThrows = [...currentThrows,{value,multiplier,points}];
+  let tempTotal = tempThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
+  if(tempTotal>remaining || remaining-tempTotal===1 || !isCheckoutPossible(tempThrows, remaining)){
     currentThrows.push({value,multiplier,points:"Bust"});
     endTurn();
     return;
@@ -164,7 +183,8 @@ function submitTurn(){
   const total = currentThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
   const remainingBefore = playerScores[player.id];
 
-  if(total>remainingBefore || remainingBefore-total===1 || (remainingBefore-total===0 && currentThrows.slice(-1)[0].multiplier!==2)){
+  let tempTotalThrows = currentThrows;
+  if(total>remainingBefore || remainingBefore-total===1 || !isCheckoutPossible(tempTotalThrows, remainingBefore)){
     currentThrows=[];
     updateThrows();
     endTurn();
