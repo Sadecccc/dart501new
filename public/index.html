@@ -246,9 +246,10 @@ function joinGame(){
   document.getElementById("gameArea").style.display="block";
 }
 
-socket.on("gameCreated",id=>{
-  gameId=id;
-  document.getElementById("link").innerText=window.location.origin+"?game="+id;
+socket.on("gameCreated", id => {
+  gameId = id;
+  document.getElementById("link").innerHTML = 
+      'Lobby-Link: <a href="?game=' + id + '" target="_blank">' + window.location.origin + '?game=' + id + '</a>';
 });
 
 socket.on("gameUpdate",game=>{
