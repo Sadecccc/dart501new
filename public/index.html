@@ -1,6 +1,29 @@
 <!DOCTYPE html>
 <html>
-<h3>Average: <span id="avg">0.00</span></h3>
+<div id="gameArea" style="display:none;">
+
+  <div class="card">
+    <h2 id="turn"></h2>
+    <pre id="scores"></pre>
+    <h3>Average: <span id="avg">0.00</span></h3>
+  </div>
+
+  <div class="card" id="multipliers">
+    <button onclick="setMultiplier(1)" id="m1">Single</button>
+    <button onclick="setMultiplier(2)" id="m2">Double</button>
+    <button onclick="setMultiplier(3)" id="m3">Triple</button>
+  </div>
+
+  <div class="card">
+    <div id="numbers"></div>
+  </div>
+
+  <div class="card">
+    <p id="throws"></p>
+    <button onclick="undo()">Undo</button>
+  </div>
+
+</div>
 <head>
   <title>Dart 501</title>
   <style>
@@ -40,6 +63,59 @@ button {
   background: #1e1e1e;
   padding: 20px;
   border-radius: 15px;
+}
+</style>
+  <style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+}
+
+h1 {
+  text-align: center;
+}
+
+#gameArea {
+  padding: 15px;
+}
+
+button {
+  border: none;
+  border-radius: 12px;
+  padding: 15px;
+  font-size: 18px;
+  margin: 4px;
+}
+
+#numbers {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+#numbers button {
+  background: #1e293b;
+  color: white;
+}
+
+#numbers button:active {
+  background: #334155;
+}
+
+#multipliers button {
+  width: 30%;
+}
+
+.active {
+  background: #22c55e !important;
+}
+
+.card {
+  background: #1e293b;
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
 }
 </style>
   </style>
