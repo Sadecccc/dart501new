@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+<h3>Average: <span id="avg">0.00</span></h3>
 <head>
   <title>Dart 501</title>
   <style>
@@ -77,7 +78,9 @@ button {
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+let totalPoints = 0;
+let totalDarts = 0;
+  const socket = io();
 
 let gameId = null;
 let multiplier = 1;
@@ -148,7 +151,14 @@ function undo() {
 
 function submitTurn() {
   const total = currentThrows.reduce((s, t) => s + t.points, 0);
+
   const last = currentThrows[currentThrows.length - 1];
+
+  // 🎯 Average berechnen
+  totalPoints += total;
+  totalDarts += currentThrows.length;
+
+  updateAverage();
 
   socket.emit("throw", {
     gameId,
@@ -159,12 +169,22 @@ function submitTurn() {
   currentThrows = [];
   updateThrows();
 }
+  });
+
+  currentThrows = [];
+  updateThrows();
+}
 
 function createGame() {
   const name = document.getElementById("name").value;
   socket.emit("createGame", { name });
 }
+function updateAverage() {
+  if (totalDarts === 0) return;
 
+  const avg = (totalPoints / totalDarts) * 3;
+  document.getElementById("avg").innerText = avg.toFixed(2);
+}
 function joinGame() {
   const name = document.getElementById("name").value;
   gameId = document.getElementById("gameIdInput").value;
