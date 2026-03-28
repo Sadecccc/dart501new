@@ -5,38 +5,67 @@
 <title>Dart 501 Online</title>
 <style>
 body {
-  margin:0;
+  margin: 0;
   font-family: Arial, sans-serif;
-  background:#0f172a;
-  color:white;
-  text-align:center;
+  background: #0f172a;
+  color: white;
+  text-align: center;
 }
-h1 {margin:10px;}
-input {padding:10px; margin:5px; border-radius:8px; border:none; font-size:16px;}
-button {border:none; border-radius:12px; padding:12px; font-size:16px; margin:4px; background:#1e293b; color:white; cursor:pointer;}
-button:active {background:#334155;}
-.active {background:#22c55e !important;}
-#numbers {display:grid; grid-template-columns: repeat(5,1fr); margin:10px auto; max-width:400px;}
-#multipliers button {width:30%;}
-.card {background:#1e293b; padding:10px; border-radius:12px; margin-bottom:10px;}
-#gameArea {padding:15px; display:none;}
-#overlay {position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; justify-content:center; align-items:center;}
-.overlay-content {background:#1e1e1e; padding:20px; border-radius:15px; max-width:400px;}
-.player-stats {display:flex; justify-content:space-between; margin-bottom:10px;}
-.stats {background:#1e293b; padding:10px; border-radius:10px; width:48%; text-align:left;}
-.stats h3 {margin:0 0 5px 0;}
-.last-throws p {margin:2px 0;}
-.last-throws .last {font-weight:bold;}
+h1 { margin-top: 10px; }
+input {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 8px;
+  border: none;
+  font-size: 16px;
+}
+button {
+  border: none;
+  border-radius: 12px;
+  padding: 15px;
+  font-size: 16px;
+  margin: 4px;
+  background: #1e293b;
+  color: white;
+  cursor: pointer;
+}
+button:active { background: #334155; }
+.active { background: #22c55e !important; }
+#numbers {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin: 10px auto;
+  max-width: 400px;
+}
+#multipliers button { width: 30%; }
+.card {
+  background: #1e293b;
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+#gameArea { padding: 15px; display: none; }
+#overlay {
+  position: fixed;
+  top:0; left:0; width:100%; height:100%;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+.overlay-content {
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 15px;
+}
 </style>
 </head>
 <body>
 
 <h1>Dart 501 Online</h1>
 
-<div class="card" id="setup">
+<div class="card">
   <input id="name" placeholder="Dein Name">
-  <input type="number" id="setsToWin" placeholder="Sets zum Sieg" value="3">
-  <input type="number" id="legsToWin" placeholder="Legs zum Sieg" value="5">
   <button onclick="createGame()">Spiel erstellen</button>
   <input id="gameIdInput" placeholder="Game ID">
   <button onclick="joinGame()">Beitreten</button>
@@ -44,7 +73,11 @@ button:active {background:#334155;}
 </div>
 
 <div id="gameArea">
-  <div class="player-stats" id="playerStats"></div>
+  <div class="card">
+    <h2 id="turn"></h2>
+    <pre id="scores"></pre>
+    <h3>Average: <span id="avg">0.00</span></h3>
+  </div>
 
   <div class="card" id="multipliers">
     <button onclick="setMultiplier(1)" id="m1" class="active">Single</button>
@@ -58,12 +91,7 @@ button:active {background:#334155;}
   </div>
 
   <div class="card">
-    <h3>Letzte 5 Würfe</h3>
-    <div class="last-throws" id="lastThrows"></div>
-  </div>
-
-  <div class="card">
-    <h3>Aktueller Wurf</h3>
+    <h3>Wurf</h3>
     <p id="throws"></p>
     <button onclick="undo()">Undo</button>
     <button onclick="submitTurn()">Zug beenden</button>
@@ -83,152 +111,142 @@ button:active {background:#334155;}
 let gameId;
 let currentThrows = [];
 let multiplier = 1;
-let totalPoints = {}; // PlayerID -> total points for Average
-let totalDarts = {};  // PlayerID -> darts thrown for Average
-let lastThrows = {};  // PlayerID -> array of last 5 throws
-let players = [];
-let playerScores = {}; // playerId -> current score
-let setsToWin = 3;
-let legsToWin = 5;
+let totalPoints = 0;
+let totalDarts = 0;
 
 const socket = io();
 
 // ---------------------------
-// Setup Zahlen Buttons
+// Zahlen Buttons generieren
 const numbersDiv = document.getElementById("numbers");
-for(let i=1;i<=20;i++){
-  const btn=document.createElement("button");
-  btn.innerText=i;
-  btn.onclick=()=>addThrow(i);
+for (let i = 1; i <= 20; i++) {
+  const btn = document.createElement("button");
+  btn.innerText = i;
+  btn.onclick = () => addThrow(i);
   numbersDiv.appendChild(btn);
 }
-const bull=document.createElement("button");
-bull.innerText="25";
-bull.onclick=()=>addThrow(25);
+const bull = document.createElement("button");
+bull.innerText = "25";
+bull.onclick = () => addThrow(25);
 numbersDiv.appendChild(bull);
 
 // ---------------------------
-// Spielerstatistiken anzeigen
-function updatePlayerStats(){
-  const container=document.getElementById("playerStats");
-  container.innerHTML="";
-  players.forEach((p,i)=>{
-    const div=document.createElement("div");
-    div.className="stats";
-    let avg=(totalDarts[p.id]? (totalPoints[p.id]/totalDarts[p.id]*3).toFixed(2) : "0.00");
-    let last=lastThrows[p.id]||[];
-    let lastHTML=last.map((v,idx)=>(idx===last.length-1? `<p class="last">${v}</p>`:`<p>${v}</p>`)).join("");
-    div.innerHTML=`<h3>${p.name}</h3>
-      <p>Score: ${playerScores[p.id]||501}</p>
-      <p>Average: ${avg}</p>
-      <div class="last-throws">${lastHTML}</div>`;
-    container.appendChild(div);
-  });
-}
-
-// ---------------------------
 // Darts hinzufügen
-function addThrow(value){
-  if(currentThrows.length>=3) return;
-  const currentPlayer=players.find(p=>p.id===gameId); // einfacher Platzhalter
-  let points=value*multiplier;
-  if(value===25 && multiplier===2) points=50;
+function addThrow(value) {
+  if (currentThrows.length >= 3) return;
 
-  const remaining=playerScores[currentPlayer.id]||501;
+  let points = value * multiplier;
+  if (value === 25 && multiplier === 2) points = 50;
 
-  // Check Überwurf oder Checkout
-  if(points>remaining || (remaining-points===1)){
-    currentThrows.push({value,multiplier,points:"Bust"});
-    endTurn(); // sofort nächster Spieler
-    return;
-  }
-
-  currentThrows.push({value,multiplier,points});
+  currentThrows.push({ value, multiplier, points });
   updateThrows();
 
-  // Auto Single zurücksetzen
+  // Nach jedem Dart zurück auf Single
   setMultiplier(1);
 
-  // Auto Ende nach 3 Darts
-  if(currentThrows.length===3) setTimeout(()=>submitTurn(),500);
+  // Auto-Zug nach 3 Darts
+  if (currentThrows.length === 3) {
+    setTimeout(() => submitTurn(), 500);
+  }
 }
 
 // ---------------------------
-function submitTurn(){
-  const total=currentThrows.reduce((s,t)=>typeof t.points==="number"? s+t.points:s,0);
-  const last=currentThrows[currentThrows.length-1];
-  const currentPlayer=players.find(p=>p.id===gameId);
+// Submit Turn
+function submitTurn() {
+  const total = currentThrows.reduce((s, t) => s + t.points, 0);
+  const last = currentThrows[currentThrows.length - 1];
 
-  playerScores[currentPlayer.id]-=total;
-  if(!totalPoints[currentPlayer.id]) totalPoints[currentPlayer.id]=0;
-  totalPoints[currentPlayer.id]+=total;
-  if(!totalDarts[currentPlayer.id]) totalDarts[currentPlayer.id]=0;
-  totalDarts[currentPlayer.id]+=currentThrows.filter(t=>typeof t.points==="number").length;
+  totalPoints += total;
+  totalDarts += currentThrows.length;
 
-  if(!lastThrows[currentPlayer.id]) lastThrows[currentPlayer.id]=[];
-  lastThrows[currentPlayer.id].push(...currentThrows.map(t=>typeof t.points==="number"?t.points:"Bust"));
-  if(lastThrows[currentPlayer.id].length>5) lastThrows[currentPlayer.id]=lastThrows[currentPlayer.id].slice(-5);
+  updateAverage();
 
+  socket.emit("throw", {
+    gameId,
+    points: total,
+    isDouble: last && last.multiplier === 2
+  });
+
+  currentThrows = [];
   updateThrows();
-  updatePlayerStats();
-
-  socket.emit("throw",{gameId,points:total});
-  currentThrows=[];
 }
 
 // ---------------------------
-function endTurn(){
-  currentThrows=[];
+// Average
+function updateAverage() {
+  if (totalDarts === 0) return;
+  const avg = (totalPoints / totalDarts) * 3;
+  document.getElementById("avg").innerText = avg.toFixed(2);
+}
+
+// ---------------------------
+// Wurf anzeigen
+function updateThrows() {
+  document.getElementById("throws").innerText =
+    currentThrows.map(t => `${t.value}x${t.multiplier}`).join(", ");
+}
+
+// ---------------------------
+// Undo
+function undo() {
+  currentThrows.pop();
   updateThrows();
-  // TODO: Socket Event für nächsten Spieler senden
 }
 
 // ---------------------------
-function updateThrows(){
-  document.getElementById("throws").innerText=currentThrows.map(t=>`${t.value}x${t.multiplier} (${t.points})`).join(", ");
+// Multiplier setzen
+function setMultiplier(m) {
+  multiplier = m;
+  document.querySelectorAll("#m1,#m2,#m3").forEach(b => b.classList.remove("active"));
+  document.getElementById("m" + m).classList.add("active");
 }
 
 // ---------------------------
-function undo(){currentThrows.pop(); updateThrows();}
-function setMultiplier(m){multiplier=m; document.querySelectorAll("#m1,#m2,#m3").forEach(b=>b.classList.remove("active")); document.getElementById("m"+m).classList.add("active");}
-
-// ---------------------------
-function createGame(){
-  const name=document.getElementById("name").value;
-  setsToWin=parseInt(document.getElementById("setsToWin").value)||3;
-  legsToWin=parseInt(document.getElementById("legsToWin").value)||5;
-  if(!name){alert("Bitte Namen eingeben!"); return;}
-  socket.emit("createGame",{name,setsToWin,legsToWin});
+// Spiel erstellen
+function createGame() {
+  const name = document.getElementById("name").value;
+  if (!name) { alert("Bitte einen Namen eingeben!"); return; }
+  socket.emit("createGame", { name });
 }
 
 // ---------------------------
-function joinGame(){
-  const name=document.getElementById("name").value;
-  gameId=document.getElementById("gameIdInput").value;
-  socket.emit("joinGame",{gameId,name});
-  document.getElementById("gameArea").style.display="block";
+// Spiel beitreten
+function joinGame() {
+  const name = document.getElementById("name").value;
+  gameId = document.getElementById("gameIdInput").value;
+  socket.emit("joinGame", { gameId, name });
+  document.getElementById("gameArea").style.display = "block";
 }
 
 // ---------------------------
-socket.on("gameCreated",id=>{
-  gameId=id;
-  document.getElementById("link").innerText=window.location.origin+"?game="+id;
-  document.getElementById("gameArea").style.display="block";
+// Socket Events
+socket.on("gameCreated", (id) => {
+  gameId = id;
+  const link = window.location.origin + "?game=" + id;
+  document.getElementById("link").innerText = "Link: " + link;
+  document.getElementById("gameArea").style.display = "block";
 });
 
-socket.on("gameUpdate",game=>{
-  players=game.players;
-  playerScores={};
-  players.forEach(p=>playerScores[p.id]=game.scores[p.id]);
-  updatePlayerStats();
+socket.on("gameUpdate", (game) => {
+  let text = "";
+  game.players.forEach(p => {
+    text += `${p.name}: ${game.scores[p.id]}\n`;
+  });
+  document.getElementById("scores").innerText = text;
+  const current = game.players.find(p => p.id === game.turn);
+  document.getElementById("turn").innerText = "Am Zug: " + current.name;
 });
 
-socket.on("gameOver",({winner})=>{
-  document.getElementById("winnerText").innerText=winner||"Unentschieden";
-  document.getElementById("overlay").style.display="flex";
+socket.on("gameOver", ({ winner }) => {
+  document.getElementById("winnerText").innerText = winner || "Unentschieden";
+  document.getElementById("overlay").style.display = "flex";
 });
 
-function closeOverlay(){document.getElementById("overlay").style.display="none";}
+// ---------------------------
+// Overlay schließen
+function closeOverlay() {
+  document.getElementById("overlay").style.display = "none";
+}
 </script>
 
 </body>
