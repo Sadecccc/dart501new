@@ -126,83 +126,40 @@ button {
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+let gameId;
+let currentThrows = [];
+let multiplier = 1;
 let totalPoints = 0;
 let totalDarts = 0;
-  const socket = io();
 
-let gameId = null;
-let multiplier = 1;
-let currentThrows = [];
+const socket = io();
 
-const numbersDiv = document.getElementById("numbers");
-
-for (let i = 1; i <= 20; i++) {
-  const btn = document.createElement("button");
-  btn.innerText = i;
-  btn.onclick = () => addThrow(i);
-  numbersDiv.appendChild(btn);
-}
-
-const bull = document.createElement("button");
-bull.innerText = "Bull";
-bull.onclick = () => addThrow(25);
-numbersDiv.appendChild(bull);
-
-function setMultiplier(m) {
-  multiplier = m;
-
-  document.querySelectorAll("#m1,#m2,#m3")
-    .forEach(b => b.classList.remove("active"));
-
-  document.getElementById("m" + m).classList.add("active");
-}
-}
-
+// ---------------------------
+// Darts hinzufügen
 function addThrow(value) {
   if (currentThrows.length >= 3) return;
 
   let points = value * multiplier;
+  if (value === 25 && multiplier === 2) points = 50;
 
-  if (value === 25 && multiplier === 2) {
-    points = 50;
-  }
-
-  currentThrows.push({
-    value,
-    multiplier,
-    points
-  });
-
+  currentThrows.push({ value, multiplier, points });
   updateThrows();
 
-  // 🎯 NEU: Nach jedem Dart wieder auf Single setzen
+  // Nach jedem Dart wieder auf Single
   setMultiplier(1);
 
-  // 🎯 NEU: Nach 3 Darts automatisch abschicken
+  // Nach 3 Darts automatisch submit
   if (currentThrows.length === 3) {
-    setTimeout(() => {
-      submitTurn();
-    }, 500); // kleine Verzögerung für UX
+    setTimeout(() => submitTurn(), 500);
   }
 }
-}
 
-function updateThrows() {
-  document.getElementById("throws").innerText =
-    currentThrows.map(t => `${t.multiplier}x${t.value} (${t.points})`).join(" | ");
-}
-
-function undo() {
-  currentThrows.pop();
-  updateThrows();
-}
-
+// ---------------------------
+// Submit Turn
 function submitTurn() {
   const total = currentThrows.reduce((s, t) => s + t.points, 0);
-
   const last = currentThrows[currentThrows.length - 1];
 
-  // 🎯 Average berechnen
   totalPoints += total;
   totalDarts += currentThrows.length;
 
@@ -217,12 +174,25 @@ function submitTurn() {
   currentThrows = [];
   updateThrows();
 }
-  });
 
-  currentThrows = [];
-  updateThrows();
+// ---------------------------
+// Average anzeigen
+function updateAverage() {
+  if (totalDarts === 0) return;
+  const avg = (totalPoints / totalDarts) * 3;
+  document.getElementById("avg").innerText = avg.toFixed(2);
 }
 
+// ---------------------------
+// Multiplier setzen
+function setMultiplier(m) {
+  multiplier = m;
+  document.querySelectorAll("#m1,#m2,#m3").forEach(b => b.classList.remove("active"));
+  document.getElementById("m" + m).classList.add("active");
+}
+
+// ---------------------------
+// Spiel erstellen
 function createGame() {
   const name = document.getElementById("name").value;
   if (!name) {
@@ -231,13 +201,9 @@ function createGame() {
   }
   socket.emit("createGame", { name });
 }
-}
-function updateAverage() {
-  if (totalDarts === 0) return;
 
-  const avg = (totalPoints / totalDarts) * 3;
-  document.getElementById("avg").innerText = avg.toFixed(2);
-}
+// ---------------------------
+// Spiel beitreten
 function joinGame() {
   const name = document.getElementById("name").value;
   gameId = document.getElementById("gameIdInput").value;
@@ -246,6 +212,8 @@ function joinGame() {
   document.getElementById("gameArea").style.display = "block";
 }
 
+// ---------------------------
+// Socket Events
 socket.on("gameCreated", (id) => {
   gameId = id;
   const link = window.location.origin + "?game=" + id;
@@ -264,9 +232,17 @@ socket.on("gameUpdate", (game) => {
   document.getElementById("turn").innerText = "Am Zug: " + current.name;
 });
 
-socket.on("gameOver", () => {
-  alert("Spiel beendet!");
+socket.on("gameOver", ({ winner }) => {
+  document.getElementById("winnerText").innerText = winner || "Unentschieden";
+  document.getElementById("overlay").style.display = "flex";
 });
+
+// ---------------------------
+// Overlay schließen
+function closeOverlay() {
+  document.getElementById("overlay").style.display = "none";
+}
+</script>
 </script>
 <div id="overlay" class="overlay">
   <div class="overlay-content">
