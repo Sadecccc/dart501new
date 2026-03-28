@@ -4,31 +4,25 @@
 <meta charset="UTF-8">
 <title>Dart 501 Online</title>
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: white;
-  text-align: center;
-}
-h1 { margin-top: 10px; }
-input { padding: 10px; margin: 5px; border-radius: 8px; border: none; font-size: 16px; }
-button { border: none; border-radius: 12px; padding: 15px; font-size: 16px; margin: 4px; background: #1e293b; color: white; cursor: pointer; }
-button:active { background: #334155; }
-.active { background: #22c55e !important; }
-#numbers { display: grid; grid-template-columns: repeat(5, 1fr); margin: 10px auto; max-width: 400px; }
-#multipliers button { width: 30%; }
-.card { background: #1e293b; padding: 10px; border-radius: 12px; margin-bottom: 10px; }
-#gameArea { padding: 15px; display: none; }
-#overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; }
-.overlay-content { background: #1e1e1e; padding: 20px; border-radius: 15px; max-width:400px; }
-.player-stats { display: flex; justify-content: space-between; margin-bottom:10px; }
-.stats { background:#1e293b; padding:10px; border-radius:10px; width:48%; text-align:left; }
-.stats h3 { margin:0 0 5px 0; }
-.last-throws p { margin:2px 0; }
-.last-throws .last { font-weight:bold; }
-.checkout { margin-top:10px; font-size:14px; color:#22c55e; }
-.set-leg-display { margin-top:5px; font-size:14px; color:#a5b4fc; }
+body { margin:0;font-family:Arial,sans-serif; background:#0f172a;color:white;text-align:center; }
+h1{margin-top:10px;}
+input{padding:10px;margin:5px;border-radius:8px;border:none;font-size:16px;}
+button{border:none;border-radius:12px;padding:15px;font-size:16px;margin:4px;background:#1e293b;color:white;cursor:pointer;}
+button:active{background:#334155;}
+.active{background:#22c55e !important;}
+#numbers{display:grid;grid-template-columns:repeat(5,1fr);margin:10px auto;max-width:400px;}
+#multipliers button{width:30%;}
+.card{background:#1e293b;padding:10px;border-radius:12px;margin-bottom:10px;}
+#gameArea{padding:15px;display:none;}
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:none;justify-content:center;align-items:center;}
+.overlay-content{background:#1e1e1e;padding:20px;border-radius:15px;max-width:400px;}
+.player-stats{display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;}
+.stats{background:#1e293b;padding:10px;border-radius:10px;width:30%;min-width:180px;text-align:left;margin-bottom:5px;}
+.stats h3{margin:0 0 5px 0;}
+.last-throws p{margin:2px 0;}
+.last-throws .last{font-weight:bold;}
+.checkout{margin-top:5px;font-size:14px;color:#22c55e;}
+.set-leg-display{margin-top:3px;font-size:14px;color:#a5b4fc;}
 </style>
 </head>
 <body>
@@ -84,20 +78,21 @@ button:active { background: #334155; }
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+let socket = io();
 let gameId;
 let currentThrows = [];
 let multiplier = 1;
 let players = [];
+let currentPlayerIndex = 0;
 let playerScores = {};
 let totalPoints = {};
 let totalDarts = {};
-let lastThrows = {}; // jetzt Summe der Aufnahmen (3 Darts)
-let playerSets = {}; // gewonnene Sets
-let playerLegs = {}; // gewonnene Legs
+let lastThrows = {};
+let playerSets = {};
+let playerLegs = {};
 let setsToWin = 3;
 let legsToWin = 5;
 
-// -------------------
 // Zahlen Buttons
 const numbersDiv = document.getElementById("numbers");
 for(let i=1;i<=20;i++){
@@ -111,21 +106,20 @@ bull.innerText="25";
 bull.onclick=()=>addThrow(25);
 numbersDiv.appendChild(bull);
 
-// -------------------
-// Spielerstatistiken
+// ---------------- Player Stats anzeigen ----------------
 function updatePlayerStats(){
-  const container=document.getElementById("playerStats");
+  const container = document.getElementById("playerStats");
   container.innerHTML="";
-  players.forEach(p=>{
+  players.forEach((p,i)=>{
     const div=document.createElement("div");
     div.className="stats";
-    const avg=(totalDarts[p.id]? (totalPoints[p.id]/totalDarts[p.id]*3).toFixed(2) : "0.00");
-    const last=lastThrows[p.id]||[];
-    const lastHTML=last.map((v,idx)=>idx===last.length-1? `<p class="last">${v}</p>`:`<p>${v}</p>`).join("");
-    const sets=playerSets[p.id]||0;
-    const legs=playerLegs[p.id]||0;
-    div.innerHTML=`<h3>${p.name}</h3>
-      <p>Score: ${playerScores[p.id]||501}</p>
+    const avg = totalDarts[p.id]? (totalPoints[p.id]/totalDarts[p.id]*3).toFixed(2) : "0.00";
+    const last = lastThrows[p.id] || [];
+    const lastHTML = last.map((v,idx)=>idx===last.length-1? `<p class="last">${v}</p>`:`<p>${v}</p>`).join("");
+    const sets = playerSets[p.id]||0;
+    const legs = playerLegs[p.id]||0;
+    div.innerHTML = `<h3>${p.name}${i===currentPlayerIndex?' 🔹':''}</h3>
+      <p>Score: ${playerScores[p.id]}</p>
       <p>Average: ${avg}</p>
       <div class="set-leg-display">Sets: ${sets} | Legs: ${legs}</div>
       <div class="last-throws">Letzte 5 Aufnahmen:<br>${lastHTML}</div>`;
@@ -133,132 +127,120 @@ function updatePlayerStats(){
   });
 }
 
-// -------------------
-// Darts hinzufügen
+// ---------------- Darts hinzufügen ----------------
 function addThrow(value){
-  if(currentThrows.length>=3) return;
-  const currentPlayerId = players[0]?.id;
-  if(!currentPlayerId) return;
-
-  let points=value*multiplier;
+  if(currentThrows.length>=3 || players.length===0) return;
+  const playerId = players[currentPlayerIndex].id;
+  let points = value*multiplier;
   if(value===25 && multiplier===2) points=50;
-
-  const remaining = playerScores[currentPlayerId]||501;
-
-  // Überwurf oder Rest==1 → Zug beenden
+  const remaining = playerScores[playerId];
   if(points>remaining || remaining-points===1){
     currentThrows.push({value,multiplier,points:"Bust"});
-    endTurn(currentPlayerId);
+    endTurn();
     return;
   }
-
   currentThrows.push({value,multiplier,points});
   updateThrows();
-
-  // Checkout
-  updateCheckout(remaining - points);
-
-  // Auto Single
+  updateCheckout(remaining-points);
   setMultiplier(1);
-
-  if(currentThrows.length===3) setTimeout(()=>submitTurn(),500);
+  if(currentThrows.length===3) setTimeout(submitTurn,500);
 }
 
-// -------------------
+// ---------------- Submit Turn ----------------
 function submitTurn(){
-  const currentPlayerId = players[0]?.id;
-  if(!currentPlayerId) return;
-
-  const total=currentThrows.reduce((s,t)=>typeof t.points==="number"? s+t.points:s,0);
-  playerScores[currentPlayerId]-=total;
-  totalPoints[currentPlayerId]=(totalPoints[currentPlayerId]||0)+total;
-  totalDarts[currentPlayerId]=(totalDarts[currentPlayerId]||0)+currentThrows.filter(t=>typeof t.points==="number").length;
-
-  // Letzte 5 Aufnahmen summieren
-  if(!lastThrows[currentPlayerId]) lastThrows[currentPlayerId]=[];
+  if(players.length===0) return;
+  const playerId = players[currentPlayerIndex].id;
+  const total = currentThrows.reduce((s,t)=>typeof t.points==="number"? s+t.points:s,0);
+  playerScores[playerId]-=total;
+  totalPoints[playerId] = (totalPoints[playerId]||0)+total;
+  totalDarts[playerId] = (totalDarts[playerId]||0)+currentThrows.filter(t=>typeof t.points==="number").length;
   const sum = currentThrows.filter(t=>typeof t.points==="number").reduce((a,b)=>a+b,0);
-  lastThrows[currentPlayerId].push(sum);
-  if(lastThrows[currentPlayerId].length>5) lastThrows[currentPlayerId]=lastThrows[currentPlayerId].slice(-5);
-
+  if(!lastThrows[playerId]) lastThrows[playerId]=[];
+  lastThrows[playerId].push(sum);
+  if(lastThrows[playerId].length>5) lastThrows[playerId]=lastThrows[playerId].slice(-5);
   currentThrows=[];
   updateThrows();
   updatePlayerStats();
   document.getElementById("checkout").innerText="";
-  socket.emit("throw",{gameId,points:total});
+  if(playerScores[playerId]<=0){
+    playerLegs[playerId] = (playerLegs[playerId]||0)+1;
+    players.forEach(p=>playerScores[p.id]=501);
+    if(playerLegs[playerId]>=legsToWin){
+      playerSets[playerId] = (playerSets[playerId]||0)+1;
+      players.forEach(p=>playerLegs[p.id]=0);
+      if(playerSets[playerId]>=setsToWin){
+        document.getElementById("winnerText").innerText=players[currentPlayerIndex].name+" hat das Spiel gewonnen!";
+        document.getElementById("overlay").style.display="flex";
+        return;
+      }
+    }
+  }
+  endTurn();
 }
 
-// -------------------
-function endTurn(playerId){
-  submitTurn();
-  // TODO: Socket Event für nächsten Spieler
+// ---------------- Turn wechseln ----------------
+function endTurn(){
+  currentThrows=[];
+  currentPlayerIndex = (currentPlayerIndex+1)%players.length;
+  updatePlayerStats();
 }
 
-// -------------------
+// ---------------- Update Würfe ----------------
 function updateThrows(){
   document.getElementById("throws").innerText=currentThrows.map(t=>`${t.value}x${t.multiplier} (${t.points})`).join(", ");
 }
 
-// -------------------
+// ---------------- Undo ----------------
 function undo(){ currentThrows.pop(); updateThrows(); }
 
-// -------------------
+// ---------------- Multiplier ----------------
 function setMultiplier(m){
   multiplier=m;
   document.querySelectorAll("#m1,#m2,#m3").forEach(b=>b.classList.remove("active"));
   document.getElementById("m"+m).classList.add("active");
 }
 
-// -------------------
+// ---------------- Checkout ----------------
 function updateCheckout(remaining){
-  const checkouts = {
-    170:"T20 T20 Bull",
-    167:"T20 T19 Bull",
-    164:"T20 T18 Bull",
-    161:"T20 T17 Bull",
-    160:"T20 T20 D20",
-    158:"T20 T20 D19",
-    157:"T20 T19 D20",
-    156:"T20 T20 D18",
-    155:"T20 T19 D19",
-    154:"T20 T18 D20",
-    153:"T20 T19 D18",
-    152:"T20 T20 D16"
-  };
-  document.getElementById("checkout").innerText=checkouts[remaining]||"";
+  const checkouts = {170:"T20 T20 Bull",167:"T20 T19 Bull",164:"T20 T18 Bull",161:"T20 T17 Bull",160:"T20 T20 D20",158:"T20 T20 D19",157:"T20 T19 D20",156:"T20 T20 D18",155:"T20 T19 D19",154:"T20 T18 D20",153:"T20 T19 D18",152:"T20 T20 D16"};
+  document.getElementById("checkout").innerText = checkouts[remaining]||"";
 }
 
-// -------------------
+// ---------------- Create / Join Game ----------------
 function createGame(){
-  const name=document.getElementById("name").value;
+  const name=document.getElementById("name").value.trim();
   setsToWin=parseInt(document.getElementById("setsToWin").value)||3;
   legsToWin=parseInt(document.getElementById("legsToWin").value)||5;
   if(!name){alert("Bitte Namen eingeben!"); return;}
   socket.emit("createGame",{name,setsToWin,legsToWin});
-}
-
-// -------------------
-function joinGame(){
-  const name=document.getElementById("name").value;
-  gameId=document.getElementById("gameIdInput").value;
-  socket.emit("joinGame",{gameId,name});
+  document.getElementById("setup").style.display="none";
   document.getElementById("gameArea").style.display="block";
 }
 
-// -------------------
+function joinGame(){
+  const name=document.getElementById("name").value.trim();
+  gameId=document.getElementById("gameIdInput").value.trim();
+  if(!name||!gameId){alert("Name und Game ID benötigt!"); return;}
+  socket.emit("joinGame",{gameId,name});
+  document.getElementById("setup").style.display="none";
+  document.getElementById("gameArea").style.display="block";
+}
+
+// ---------------- Socket Events ----------------
 socket.on("gameCreated",id=>{
   gameId=id;
   document.getElementById("link").innerText=window.location.origin+"?game="+id;
-  document.getElementById("gameArea").style.display="block";
 });
 
 socket.on("gameUpdate",game=>{
-  players=game.players;
-  playerScores={};
-  players.forEach(p=>playerScores[p.id]=game.scores[p.id]);
-  // Sets & Legs simuliert
+  players=game.players.slice(0,6); 
   players.forEach(p=>{
-    playerSets[p.id]=game.sets?.[p.id]||0;
-    playerLegs[p.id]=game.legs?.[p.id]||0;
+    playerScores[p.id] = game.scores[p.id]||501;
+    totalPoints[p.id] = totalPoints[p.id]||0;
+    totalDarts[p.id] = totalDarts[p.id]||0;
+    lastThrows[p.id] = lastThrows[p.id]||[];
+    playerSets[p.id] = game.sets?.[p.id]||0;
+    playerLegs[p.id] = game.legs?.[p.id]||0;
   });
   updatePlayerStats();
 });
@@ -270,6 +252,5 @@ socket.on("gameOver",({winner})=>{
 
 function closeOverlay(){document.getElementById("overlay").style.display="none";}
 </script>
-
 </body>
 </html>
