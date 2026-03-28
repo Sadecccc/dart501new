@@ -29,6 +29,7 @@ button:active { background: #334155; }
 .last-throws .last { font-weight:bold; }
 .checkout { margin-top:10px; font-size:14px; color:#22c55e; }
 .set-leg-display { margin-top:5px; font-size:14px; color:#a5b4fc; }
+.score { font-size:35px; font-weight:bold; color:#facc15; margin:5px 0; }
 </style>
 </head>
 <body>
@@ -88,12 +89,14 @@ let gameId;
 let currentThrows = [];
 let multiplier = 1;
 let players = [];
+let currentPlayerIndex = 0;
+
 let playerScores = {};
 let totalPoints = {};
 let totalDarts = {};
-let lastThrows = {}; // jetzt Summe der Aufnahmen (3 Darts)
-let playerSets = {}; // gewonnene Sets
-let playerLegs = {}; // gewonnene Legs
+let lastThrows = {};
+let playerSets = {};
+let playerLegs = {};
 let setsToWin = 3;
 let legsToWin = 5;
 
@@ -116,7 +119,7 @@ numbersDiv.appendChild(bull);
 function updatePlayerStats(){
   const container=document.getElementById("playerStats");
   container.innerHTML="";
-  players.forEach(p=>{
+  players.forEach((p,i)=>{
     const div=document.createElement("div");
     div.className="stats";
     const avg=(totalDarts[p.id]? (totalPoints[p.id]/totalDarts[p.id]*3).toFixed(2) : "0.00");
@@ -124,8 +127,9 @@ function updatePlayerStats(){
     const lastHTML=last.map((v,idx)=>idx===last.length-1? `<p class="last">${v}</p>`:`<p>${v}</p>`).join("");
     const sets=playerSets[p.id]||0;
     const legs=playerLegs[p.id]||0;
-    div.innerHTML=`<h3>${p.name}</h3>
-      <p>Score: ${playerScores[p.id]||501}</p>
+    const currentScore = playerScores[p.id]!==undefined? playerScores[p.id]:501;
+    div.innerHTML=`<h3>${p.name}${i===currentPlayerIndex?' 🔹':''}</h3>
+      <p class="score">Score: ${currentScore}</p>
       <p>Average: ${avg}</p>
       <div class="set-leg-display">Sets: ${sets} | Legs: ${legs}</div>
       <div class="last-throws">Letzte 5 Aufnahmen:<br>${lastHTML}</div>`;
@@ -137,65 +141,94 @@ function updatePlayerStats(){
 // Darts hinzufügen
 function addThrow(value){
   if(currentThrows.length>=3) return;
-  const currentPlayerId = players[0]?.id;
-  if(!currentPlayerId) return;
+  const player = players[currentPlayerIndex];
+  if(!player) return;
 
   let points=value*multiplier;
   if(value===25 && multiplier===2) points=50;
 
-  const remaining = playerScores[currentPlayerId]||501;
+  const remaining = playerScores[player.id] || 501;
 
-  // Überwurf oder Rest==1 → Zug beenden
-  if(points>remaining || remaining-points===1){
+  // Bust oder Rest == 1 → sofort Zug beenden
+  if(points>remaining || (remaining-points===1) || (remaining-points===0 && multiplier!==2)){
+    // nur bei korrektes Doppel ausmachen erlaubt
     currentThrows.push({value,multiplier,points:"Bust"});
-    endTurn(currentPlayerId);
+    endTurn();
     return;
   }
 
   currentThrows.push({value,multiplier,points});
   updateThrows();
-
-  // Checkout
   updateCheckout(remaining - points);
-
-  // Auto Single
   setMultiplier(1);
 
-  if(currentThrows.length===3) setTimeout(()=>submitTurn(),500);
+  if(currentThrows.length===3) setTimeout(()=>submitTurn(),100);
 }
 
 // -------------------
 function submitTurn(){
-  const currentPlayerId = players[0]?.id;
-  if(!currentPlayerId) return;
+  const player = players[currentPlayerIndex];
+  if(!player) return;
 
-  const total=currentThrows.reduce((s,t)=>typeof t.points==="number"? s+t.points:s,0);
-  playerScores[currentPlayerId]-=total;
-  totalPoints[currentPlayerId]=(totalPoints[currentPlayerId]||0)+total;
-  totalDarts[currentPlayerId]=(totalDarts[currentPlayerId]||0)+currentThrows.filter(t=>typeof t.points==="number").length;
+  const total=currentThrows.reduce((sum,t)=>typeof t.points==="number"? sum+t.points:sum,0);
 
-  // Letzte 5 Aufnahmen summieren
-  if(!lastThrows[currentPlayerId]) lastThrows[currentPlayerId]=[];
-  const sum = currentThrows.filter(t=>typeof t.points==="number").reduce((a,b)=>a+b,0);
-  lastThrows[currentPlayerId].push(sum);
-  if(lastThrows[currentPlayerId].length>5) lastThrows[currentPlayerId]=lastThrows[currentPlayerId].slice(-5);
+  const remainingBefore=playerScores[player.id];
+
+  // Bust Regel
+  if(total>remainingBefore || remainingBefore-total===1 || (remainingBefore-total===0 && currentThrows.slice(-1)[0].multiplier!==2)){
+    // Score zurücksetzen
+    currentThrows=[];
+    updateThrows();
+    endTurn();
+    return;
+  }
+
+  playerScores[player.id]-=total;
+  totalPoints[player.id]=(totalPoints[player.id]||0)+total;
+  totalDarts[player.id]=(totalDarts[player.id]||0)+currentThrows.filter(t=>typeof t.points==="number").length;
+
+  // Letzte 5 Aufnahmen Summe
+  if(!lastThrows[player.id]) lastThrows[player.id]=[];
+  const sum=currentThrows.filter(t=>typeof t.points==="number").reduce((a,b)=>a+b,0);
+  lastThrows[player.id].push(sum);
+  if(lastThrows[player.id].length>5) lastThrows[player.id]=lastThrows[player.id].slice(-5);
+
+  // Leg Ende prüfen
+  if(playerScores[player.id]===0){
+    playerLegs[player.id]=(playerLegs[player.id]||0)+1;
+    players.forEach(p=>playerScores[p.id]=501);
+
+    if(playerLegs[player.id]>=legsToWin){
+      playerSets[player.id]=(playerSets[player.id]||0)+1;
+      players.forEach(p=>playerLegs[p.id]=0);
+
+      if(playerSets[player.id]>=setsToWin){
+        document.getElementById("winnerText").innerText=player.name+" hat das Spiel gewonnen!";
+        document.getElementById("overlay").style.display="flex";
+        return;
+      }
+    }
+  }
 
   currentThrows=[];
   updateThrows();
-  updatePlayerStats();
   document.getElementById("checkout").innerText="";
-  socket.emit("throw",{gameId,points:total});
+  updatePlayerStats();
+  endTurn();
 }
 
 // -------------------
-function endTurn(playerId){
-  submitTurn();
-  // TODO: Socket Event für nächsten Spieler
+function endTurn(){
+  currentThrows=[];
+  currentPlayerIndex=(currentPlayerIndex+1)%players.length;
+  updatePlayerStats();
+  updateThrows();
+  document.getElementById("checkout").innerText="";
 }
 
 // -------------------
 function updateThrows(){
-  document.getElementById("throws").innerText=currentThrows.map(t=>`${t.value}x${t.multiplier} (${t.points})`).join(", ");
+  document.getElementById("throws").innerText=currentThrows.map(t=>typeof t.points==="number"? t.points: t.points).join(", ");
 }
 
 // -------------------
@@ -210,21 +243,9 @@ function setMultiplier(m){
 
 // -------------------
 function updateCheckout(remaining){
-  const checkouts = {
-    170:"T20 T20 Bull",
-    167:"T20 T19 Bull",
-    164:"T20 T18 Bull",
-    161:"T20 T17 Bull",
-    160:"T20 T20 D20",
-    158:"T20 T20 D19",
-    157:"T20 T19 D20",
-    156:"T20 T20 D18",
-    155:"T20 T19 D19",
-    154:"T20 T18 D20",
-    153:"T20 T19 D18",
-    152:"T20 T20 D16"
-  };
-  document.getElementById("checkout").innerText=checkouts[remaining]||"";
+  const table = {170:"T20 T20 Bull",167:"T20 T19 Bull",164:"T20 T18 Bull",161:"T20 T17 Bull",
+    160:"T20 T20 D20",158:"T20 T20 D19",157:"T20 T19 D20",156:"T20 T20 D18",155:"T20 T19 D19"};
+  document.getElementById("checkout").innerText=table[remaining]||"";
 }
 
 // -------------------
@@ -234,6 +255,8 @@ function createGame(){
   legsToWin=parseInt(document.getElementById("legsToWin").value)||5;
   if(!name){alert("Bitte Namen eingeben!"); return;}
   socket.emit("createGame",{name,setsToWin,legsToWin});
+  document.getElementById("setup").style.display="none";
+  document.getElementById("gameArea").style.display="block";
 }
 
 // -------------------
@@ -241,6 +264,7 @@ function joinGame(){
   const name=document.getElementById("name").value;
   gameId=document.getElementById("gameIdInput").value;
   socket.emit("joinGame",{gameId,name});
+  document.getElementById("setup").style.display="none";
   document.getElementById("gameArea").style.display="block";
 }
 
@@ -248,14 +272,11 @@ function joinGame(){
 socket.on("gameCreated",id=>{
   gameId=id;
   document.getElementById("link").innerText=window.location.origin+"?game="+id;
-  document.getElementById("gameArea").style.display="block";
 });
 
 socket.on("gameUpdate",game=>{
   players=game.players;
-  playerScores={};
-  players.forEach(p=>playerScores[p.id]=game.scores[p.id]);
-  // Sets & Legs simuliert
+  players.forEach(p=>playerScores[p.id]=game.scores[p.id]||501);
   players.forEach(p=>{
     playerSets[p.id]=game.sets?.[p.id]||0;
     playerLegs[p.id]=game.legs?.[p.id]||0;
