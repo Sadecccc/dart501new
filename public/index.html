@@ -101,7 +101,7 @@ let playerLegs = {};
 let setsToWin = 3;
 let legsToWin = 5;
 
-// Zahlen Buttons erstellen
+// --- Zahlen Buttons erstellen ---
 const numbersDiv = document.getElementById("numbers");
 for(let i=1;i<=20;i++){
   const btn=document.createElement("button");
@@ -228,12 +228,19 @@ function updateCheckout(remaining){
   document.getElementById("checkout").innerText=table[remaining]||"";
 }
 
+// --- Neue Funktion: Game-ID generieren ---
+function generateGameId() {
+  return Math.floor(100000 + Math.random()*900000).toString(); // 6-stelliger Code
+}
+
 function createGame(){
   const name=document.getElementById("name").value;
   setsToWin=parseInt(document.getElementById("setsToWin").value)||3;
   legsToWin=parseInt(document.getElementById("legsToWin").value)||5;
   if(!name){alert("Bitte Namen eingeben!"); return;}
-  socket.emit("createGame",{name,setsToWin,legsToWin});
+  gameId = generateGameId(); // automatisch Game-ID erstellen
+  socket.emit("createGame",{name,setsToWin,legsToWin, gameId});
+  document.getElementById("link").innerText=`Game-ID: ${gameId} | Link: ${window.location.origin}?game=${gameId}`;
   document.getElementById("setup").style.display="none";
   document.getElementById("gameArea").style.display="block";
 }
@@ -241,15 +248,11 @@ function createGame(){
 function joinGame(){
   const name=document.getElementById("name").value;
   gameId=document.getElementById("gameIdInput").value;
+  if(!gameId){alert("Bitte Game-ID eingeben!"); return;}
   socket.emit("joinGame",{gameId,name});
   document.getElementById("setup").style.display="none";
   document.getElementById("gameArea").style.display="block";
 }
-
-socket.on("gameCreated",id=>{
-  gameId=id;
-  document.getElementById("link").innerText=window.location.origin+"?game="+id;
-});
 
 socket.on("gameUpdate",game=>{
   players=game.players;
