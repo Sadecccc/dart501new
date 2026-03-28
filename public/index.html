@@ -105,10 +105,31 @@ function setMultiplier(m) {
 
 function addThrow(value) {
   if (currentThrows.length >= 3) return;
+
   let points = value * multiplier;
-  if (value === 25 && multiplier === 2) points = 50;
-  currentThrows.push({ value, multiplier, points });
+
+  if (value === 25 && multiplier === 2) {
+    points = 50;
+  }
+
+  currentThrows.push({
+    value,
+    multiplier,
+    points
+  });
+
   updateThrows();
+
+  // 🎯 NEU: Nach jedem Dart wieder auf Single setzen
+  setMultiplier(1);
+
+  // 🎯 NEU: Nach 3 Darts automatisch abschicken
+  if (currentThrows.length === 3) {
+    setTimeout(() => {
+      submitTurn();
+    }, 500); // kleine Verzögerung für UX
+  }
+}
 }
 
 function updateThrows() {
