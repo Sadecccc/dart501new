@@ -231,7 +231,12 @@ function submitTurn() {
 
 function createGame() {
   const name = document.getElementById("name").value;
+  if (!name) {
+    alert("Bitte einen Namen eingeben!");
+    return;
+  }
   socket.emit("createGame", { name });
+}
 }
 function updateAverage() {
   if (totalDarts === 0) return;
